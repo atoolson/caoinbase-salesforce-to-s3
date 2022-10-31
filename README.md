@@ -43,9 +43,9 @@ case details, and the `S3Service` does the actual S3 uploading. `ConfigService` 
 Clicking on any of the following Case Ids will execute the lambda function to copy that case to S3. You can then verify
 the data by going to https://coinbase-salesforce-to-s3.s3.us-west-1.amazonaws.com/caseDetails/<CASE_ID>.json
 
-* [500Dn000002JPo2IAG](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=)
-* [500Dn000002JPoGIAW](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=)
-* [500Dn000002JPoOIAW](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=)
+* [500Dn000002JPo2IAG](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=500Dn000002JPo2IAG)
+* [500Dn000002JPoGIAW](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=500Dn000002JPoGIAW)
+* [500Dn000002JPoOIAW](https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/?caseId=500Dn000002JPoOIAW)
 
 ## How I'd Improve This App
 
