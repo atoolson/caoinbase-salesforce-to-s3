@@ -11,7 +11,9 @@ import com.andrewtoolson.model.SalesforceCaseDetails;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
@@ -30,9 +32,11 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
 
     private SalesforceAccessToken token = null;
     private final SalesforceCaseDetailsService caseDetailsService = new SalesforceCaseDetailsService();
+    private final S3Service s3Service = new S3Service();
 
     private final Gson gson = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+            .setPrettyPrinting()
             .create();
 
     @Override
@@ -40,14 +44,14 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         LambdaLogger logger = context.getLogger();
         logger.log("--- just arrived ---");
 
-        // first boot
+        // first run
         if (token == null) {
             return refreshToken(input, logger);
         }
 
         String caseId = input.getQueryStringParameters().get("caseId");
-        if (StringUtils.isBlank(caseId)) {
-            // TODO list all case ids?
+        if (StringUtils.isBlank(caseId) || "null".equals(caseId)) {
+            // TODO list all case ids
             return new HttpResponse()
                 .setStatusCode(HttpStatusCode.BAD_REQUEST)
                 .setBody("caseId must be provided as a query param");
@@ -65,6 +69,8 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
                     .setStatusCode(HttpStatusCode.INTERNAL_SERVER_ERROR)
                     .setBody("error retrieving case details");
         }
+
+        s3Service.storeInS3(json, "caseDetails/" + caseId + ".json");
 
         return new HttpResponse()
                 .setStatusCode(HttpStatusCode.OK)
@@ -85,6 +91,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
                 .setHeaders(Map.of("Location", "https://self454-dev-ed.lightning.force.com/services/oauth2/authorize?" +
                         "client_id=3MVG9ux34Ig8G5eor4b9EEsp7EnHtw67aL7CeXtZCGZtEdyRvKpnBALz2aBst4kR4KY8W6pG0K8lWUJFTCj41&" +
                         "redirect_uri=" + ROOT_URL + "&" +
+                        "state=" + request.getQueryStringParameters().get("caseId") + "&" +
                         "response_type=code"));
     }
 
@@ -96,7 +103,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         builder.addTextBody("grant_type",  "authorization_code");
         builder.addTextBody("code", code);
         builder.addTextBody("client_id",  "3MVG9ux34Ig8G5eor4b9EEsp7EnHtw67aL7CeXtZCGZtEdyRvKpnBALz2aBst4kR4KY8W6pG0K8lWUJFTCj41");
-        builder.addTextBody("client_secret",  "0B121CAB31D2D330E0A9435F044C22EB192233E18CCA21F20FCE4429E279FB68");
+        builder.addTextBody("client_secret",  "0B121CAB31D2D330E0A9435F044C22EB192233E18CCA21F20FCE4429E279FB68"); // TODO encrypt me
         builder.addTextBody("redirect_uri",  ROOT_URL);
         logger.log("going to sent request");
 
@@ -115,8 +122,10 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         response.setStatusCode(HttpStatusCode.OK);
 
         if (!token.hasError()) {
-            // TODO redirect back to the main app
-            response.setBody("successfully refreshed token; " + token);
+            // successfully got the token. redirect back to the main URL.
+            String caseId = input.getQueryStringParameters().get("state");
+            response.setHeaders(Map.of(HttpHeaders.LOCATION, ROOT_URL + "?caseId=" + caseId));
+            response.setStatusCode(HttpStatusCode.MOVED_TEMPORARILY);
         } else {
             response.setBody("there was an error getting an access code. Please visit " + ROOT_URL + " and try again.");
         }
