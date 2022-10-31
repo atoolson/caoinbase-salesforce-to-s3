@@ -35,7 +35,7 @@ those then this exercise would have been trivially simple and not demonstrated m
 * **Services**  
 This is where the integration logic lives. The `CaseToS3Controller` class receives the HTTP request, ensures an access
 token exists, retrieves the case details, and uploads them to S3. The `SalesforceCaseDetailsService` is used to get those
-case details, and the `S3Service` does the actual S3 uploading.
+case details, and the `S3Service` does the actual S3 uploading. `ConfigService` has a handful of configuration values.
 
 ## Examples
 

@@ -13,7 +13,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
@@ -28,11 +27,10 @@ import java.util.Map;
 
 public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpResponse> {
 
-    private static final String ROOT_URL = "https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/";
-
     private SalesforceAccessToken token = null;
     private final SalesforceCaseDetailsService caseDetailsService = new SalesforceCaseDetailsService();
     private final S3Service s3Service = new S3Service();
+    private final ConfigService configService = new ConfigService();
 
     private final Gson gson = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
@@ -89,8 +87,8 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         return new HttpResponse()
                 .setStatusCode(HttpStatusCode.MOVED_TEMPORARILY)
                 .setHeaders(Map.of("Location", "https://self454-dev-ed.lightning.force.com/services/oauth2/authorize?" +
-                        "client_id=3MVG9ux34Ig8G5eor4b9EEsp7EnHtw67aL7CeXtZCGZtEdyRvKpnBALz2aBst4kR4KY8W6pG0K8lWUJFTCj41&" +
-                        "redirect_uri=" + ROOT_URL + "&" +
+                        "client_id=" + configService.getSalesforceClientId() + "&" +
+                        "redirect_uri=" + configService.getRootUrl() + "&" +
                         "state=" + request.getQueryStringParameters().get("caseId") + "&" +
                         "response_type=code"));
     }
@@ -102,9 +100,9 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
 
         builder.addTextBody("grant_type",  "authorization_code");
         builder.addTextBody("code", code);
-        builder.addTextBody("client_id",  "3MVG9ux34Ig8G5eor4b9EEsp7EnHtw67aL7CeXtZCGZtEdyRvKpnBALz2aBst4kR4KY8W6pG0K8lWUJFTCj41");
-        builder.addTextBody("client_secret",  "0B121CAB31D2D330E0A9435F044C22EB192233E18CCA21F20FCE4429E279FB68"); // TODO encrypt me
-        builder.addTextBody("redirect_uri",  ROOT_URL);
+        builder.addTextBody("client_id",  configService.getSalesforceClientId());
+        builder.addTextBody("client_secret", configService.getSalesforceClientSecret());
+        builder.addTextBody("redirect_uri",  configService.getRootUrl());
         logger.log("going to sent request");
 
 
@@ -124,10 +122,10 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         if (!token.hasError()) {
             // successfully got the token. redirect back to the main URL.
             String caseId = input.getQueryStringParameters().get("state");
-            response.setHeaders(Map.of(HttpHeaders.LOCATION, ROOT_URL + "?caseId=" + caseId));
+            response.setHeaders(Map.of(HttpHeaders.LOCATION, configService.getRootUrl() + "?caseId=" + caseId));
             response.setStatusCode(HttpStatusCode.MOVED_TEMPORARILY);
         } else {
-            response.setBody("there was an error getting an access code. Please visit " + ROOT_URL + " and try again.");
+            response.setBody("there was an error getting an access code. Please visit " + configService.getRootUrl() + " and try again.");
         }
 
         return response;
