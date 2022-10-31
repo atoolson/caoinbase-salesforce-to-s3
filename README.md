@@ -22,7 +22,8 @@ bucket, and return then as a JSON payload.
 
 ### Code Layout
 
-The code is broken up into three main parts:
+The [code](https://github.com/atoolson/caoinbase-salesforce-to-s3/tree/main/src/main/java/com/andrewtoolson) is broken up
+into three main parts:
 
 * **Exceptions**  
 There is only one exception, which is used when the app has a bad access token. If this exception is thrown then a new
@@ -86,3 +87,7 @@ the data by going to https://coinbase-salesforce-to-s3.s3.us-west-1.amazonaws.co
 1. Bulk API  
    The prompt called out that the API should store details for a single case into S3. If I were building this for real
    world use then I would ask the partner team what they would use this for and if it made sense to support bulk operations.
+
+1. Documentation  
+   The documentation in this project is a little sparse, partly due to the simplicity of the project, partly due to the
+   fact I'll be explaining this code over video chat.

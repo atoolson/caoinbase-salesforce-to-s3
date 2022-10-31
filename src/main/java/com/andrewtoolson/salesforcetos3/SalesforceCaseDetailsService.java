@@ -16,6 +16,9 @@ import software.amazon.awssdk.http.HttpStatusCode;
 
 import java.io.IOException;
 
+/**
+ * This class interfaces with the Salesforce API to retrieve data around cases.
+ */
 public class SalesforceCaseDetailsService {
     private final CloseableHttpClient client = HttpClients.createDefault();
     private final Gson gson = new GsonBuilder()

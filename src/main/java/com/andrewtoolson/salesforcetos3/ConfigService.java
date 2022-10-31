@@ -1,5 +1,8 @@
 package com.andrewtoolson.salesforcetos3;
 
+/**
+ * This class makes it easy to read the configuration values set for this application
+ */
 public class ConfigService {
     public String getSalesforceClientId() {
         return System.getenv("SALESFORCE_CLIENT_ID");

@@ -25,6 +25,10 @@ import software.amazon.awssdk.utils.StringUtils;
 import java.io.IOException;
 import java.util.Map;
 
+/**
+ * This class receives the HTTP requests, ensures there is an access token in memory, retrieves the case details,
+ * then uploads them to S3.
+ */
 public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpResponse> {
 
     private SalesforceAccessToken token = null;
@@ -47,19 +51,18 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
             return refreshToken(input, logger);
         }
 
+        // ensure there is a valid caseId param
         String caseId = input.getQueryStringParameters().get("caseId");
         if (StringUtils.isBlank(caseId) || "null".equals(caseId)) {
-            // TODO list all case ids
             return new HttpResponse()
                 .setStatusCode(HttpStatusCode.BAD_REQUEST)
                 .setBody("caseId must be provided as a query param");
         }
 
-        String json = null;
-
+        // get the case details
+        SalesforceCaseDetails caseDetails;
         try {
-            SalesforceCaseDetails caseDetails = caseDetailsService.getCaseDetails(caseId, token.getAccessToken());
-            json = gson.toJson(caseDetails);
+            caseDetails = caseDetailsService.getCaseDetails(caseId, token.getAccessToken());
         } catch (BadAccessTokenException e) {
             return refreshToken(input, logger);
         } catch (IOException e) {
@@ -68,6 +71,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
                     .setBody("error retrieving case details");
         }
 
+        String json = gson.toJson(caseDetails);
         s3Service.storeInS3(json, "caseDetails/" + caseId + ".json");
 
         return new HttpResponse()
@@ -80,7 +84,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         if (request.getQueryStringParameters().containsKey("code")) {
             logger.log("has code param. refreshing token.");
             String code = request.getQueryStringParameters().get("code");
-            return refreshToken(code, logger, request);
+            return getToken(code, logger, request);
         }
 
         // there is no code param. redirect.
@@ -93,7 +97,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
                         "response_type=code"));
     }
 
-    public HttpResponse refreshToken(String code, LambdaLogger logger, HttpRequest input) {
+    public HttpResponse getToken(String code, LambdaLogger logger, HttpRequest input) {
         HttpPost post = new HttpPost("https://login.salesforce.com/services/oauth2/token");
         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
         builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);

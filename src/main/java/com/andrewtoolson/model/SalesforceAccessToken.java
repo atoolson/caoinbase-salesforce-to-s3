@@ -3,6 +3,9 @@ package com.andrewtoolson.model;
 import lombok.Data;
 import software.amazon.awssdk.utils.StringUtils;
 
+/**
+ * A class to model the access token returned from the Salesforce API
+ */
 @Data
 public class SalesforceAccessToken {
     private String accessToken;
