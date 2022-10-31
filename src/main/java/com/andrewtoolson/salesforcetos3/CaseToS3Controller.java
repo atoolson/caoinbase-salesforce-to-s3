@@ -3,9 +3,11 @@ package com.andrewtoolson.salesforcetos3;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.andrewtoolson.exception.BadAccessTokenException;
 import com.andrewtoolson.model.HttpRequest;
 import com.andrewtoolson.model.HttpResponse;
 import com.andrewtoolson.model.SalesforceAccessToken;
+import com.andrewtoolson.model.SalesforceCaseDetails;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -17,6 +19,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import software.amazon.awssdk.http.HttpStatusCode;
+import software.amazon.awssdk.utils.StringUtils;
 
 import java.io.IOException;
 import java.util.Map;
@@ -26,6 +29,7 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
     private static final String ROOT_URL = "https://ne2xddjtut7joxmjocltodf2c40jngkp.lambda-url.us-west-1.on.aws/";
 
     private SalesforceAccessToken token = null;
+    private final SalesforceCaseDetailsService caseDetailsService = new SalesforceCaseDetailsService();
 
     private final Gson gson = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
@@ -33,34 +37,38 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
 
     @Override
     public HttpResponse handleRequest(HttpRequest input, Context context) {
-        // get the case details
-        // if auth denied
-        // get auth code
-        // get access code
-        // get case details
-        // still error? throw
-        if (true)
-        return refreshToken(input, context.getLogger());
-
-
-
         LambdaLogger logger = context.getLogger();
+        logger.log("--- just arrived ---");
 
-        // log execution details
-        logger.log("ENVIRONMENT VARIABLES: " + System.getenv());
-        logger.log("CONTEXT: " + context);
+        // first boot
+        if (token == null) {
+            return refreshToken(input, logger);
+        }
 
-        // process event
-        logger.log("INPUT: " + input);
+        String caseId = input.getQueryStringParameters().get("caseId");
+        if (StringUtils.isBlank(caseId)) {
+            // TODO list all case ids?
+            return new HttpResponse()
+                .setStatusCode(HttpStatusCode.BAD_REQUEST)
+                .setBody("caseId must be provided as a query param");
+        }
 
-        String json = gson.toJson(input);
+        String json = null;
 
+        try {
+            SalesforceCaseDetails caseDetails = caseDetailsService.getCaseDetails(caseId, token.getAccessToken());
+            json = gson.toJson(caseDetails);
+        } catch (BadAccessTokenException e) {
+            return refreshToken(input, logger);
+        } catch (IOException e) {
+            return new HttpResponse()
+                    .setStatusCode(HttpStatusCode.INTERNAL_SERVER_ERROR)
+                    .setBody("error retrieving case details");
+        }
 
-        HttpResponse response = new HttpResponse();
-        response.setStatusCode(HttpStatusCode.OK);
-        response.setBody(json);
-
-        return response;
+        return new HttpResponse()
+                .setStatusCode(HttpStatusCode.OK)
+                .setBody(json);
     }
 
     private HttpResponse refreshToken(HttpRequest request, LambdaLogger logger) {
@@ -68,27 +76,19 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         if (request.getQueryStringParameters().containsKey("code")) {
             logger.log("has code param. refreshing token.");
             String code = request.getQueryStringParameters().get("code");
-            HttpResponse response = refreshToken(code, logger);
-
-            // if we could successfully get the access token from the code, then redirect back to the main URL
-            // if we couldn't then we need to redirect to the Oauth page
-            if (!token.hasError()) {
-                logger.log("no error after refreshing. returning response.");
-                return response;
-            }
+            return refreshToken(code, logger, request);
         }
 
         // there is no code param. redirect.
-        HttpResponse response = new HttpResponse();
-        response.setStatusCode(HttpStatusCode.MOVED_TEMPORARILY);
-        response.setHeaders(Map.of("Location", "https://self454-dev-ed.lightning.force.com/services/oauth2/authorize?" +
+        return new HttpResponse()
+                .setStatusCode(HttpStatusCode.MOVED_TEMPORARILY)
+                .setHeaders(Map.of("Location", "https://self454-dev-ed.lightning.force.com/services/oauth2/authorize?" +
                         "client_id=3MVG9ux34Ig8G5eor4b9EEsp7EnHtw67aL7CeXtZCGZtEdyRvKpnBALz2aBst4kR4KY8W6pG0K8lWUJFTCj41&" +
                         "redirect_uri=" + ROOT_URL + "&" +
                         "response_type=code"));
-        return response;
     }
 
-    public HttpResponse refreshToken(String code, LambdaLogger logger) {
+    public HttpResponse refreshToken(String code, LambdaLogger logger, HttpRequest input) {
         HttpPost post = new HttpPost("https://login.salesforce.com/services/oauth2/token");
         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
         builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -106,7 +106,6 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
         try {
             CloseableHttpResponse response = client.execute(post);
             String bodyAsString = EntityUtils.toString(response.getEntity());
-            logger.log("request body is: " + bodyAsString);
             token = gson.fromJson(bodyAsString, SalesforceAccessToken.class);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -114,7 +113,14 @@ public class CaseToS3Controller implements RequestHandler<HttpRequest, HttpRespo
 
         HttpResponse response = new HttpResponse();
         response.setStatusCode(HttpStatusCode.OK);
-        response.setBody("successfully refreshed token; " + token);
+
+        if (!token.hasError()) {
+            // TODO redirect back to the main app
+            response.setBody("successfully refreshed token; " + token);
+        } else {
+            response.setBody("there was an error getting an access code. Please visit " + ROOT_URL + " and try again.");
+        }
+
         return response;
     }
 }
