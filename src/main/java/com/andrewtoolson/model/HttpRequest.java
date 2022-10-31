@@ -1,4 +1,9 @@
 package com.andrewtoolson.model;
+
+/**
+ * Taken from https://github.com/shalabh-jaiswal/aws-lambda-patterns/blob/master/src/main/java/us/shalabh/alp/model/HttpRequest.java
+ */
+
 import lombok.Data;
 import lombok.experimental.Accessors;
 
